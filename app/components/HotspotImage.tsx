@@ -2,10 +2,10 @@
 
 import { Pick } from '@/lib/catalogue';
 
-type Hotspot = { sku: string; bbox: [number, number, number, number] };
+type Hotspot = { sku: string; bbox: [number, number, number, number]; fallback?: boolean };
 
 export default function HotspotImage({
-  url, hotspots, picks, active, setActive, onAdd, basket,
+  url, hotspots, picks, active, setActive, onAdd, basket, aspectRatio,
 }: {
   url: string;
   hotspots: Hotspot[];
@@ -14,11 +14,17 @@ export default function HotspotImage({
   setActive: (n: number | null) => void;
   onAdd: (sku: string) => void;
   basket: string[];
+  aspectRatio: string; // e.g. "4 / 3"
 }) {
   return (
     <div className="relative border-2 border-black bg-white p-2">
-      <div className="relative">
-        <img src={url} alt="rendered" className="w-full aspect-[4/3] object-cover block"/>
+      <div className="relative" onMouseLeave={() => setActive(null)}>
+        <img
+          src={url}
+          alt="rendered"
+          className="w-full object-cover block"
+          style={{ aspectRatio }}
+        />
         {hotspots.map((h, i) => {
           const pick = picks.find(p => p.product.sku === h.sku);
           if (!pick) return null;
@@ -28,13 +34,17 @@ export default function HotspotImage({
           return (
             <button
               key={i}
+              onMouseEnter={() => setActive(i)}
               onClick={() => setActive(isActive ? null : i)}
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{ left: `${cx}%`, top: `${cy}%` }}
               aria-label={pick.product.name}
             >
               <div className="hotspot-ring relative w-7 h-7 rounded-full flex items-center justify-center"
-                   style={{ background: '#FFDB00', border: '2px solid #0A0A0A' }}>
+                   style={{
+                     background: h.fallback ? '#FFFFFF' : '#FFDB00',
+                     border: '2px solid #0A0A0A',
+                   }}>
                 <span className="f-mono text-[11px] font-bold">{i + 1}</span>
               </div>
             </button>
@@ -48,12 +58,15 @@ export default function HotspotImage({
           const top = (h.bbox[1] + h.bbox[3]) * 100;
           const inBasket = basket.includes(h.sku);
           return (
-            <div className="absolute z-20 -translate-x-1/2"
+            <div className="absolute z-20 -translate-x-1/2 pointer-events-none"
                  style={{ left: `${cx}%`, top: `${Math.min(top + 1, 72)}%`, minWidth: '200px', maxWidth: '240px' }}>
-              <div className="bg-white border-2 border-black p-3 shadow-lg">
+              <div className="bg-white border-2 border-black p-3 shadow-lg pointer-events-auto"
+                   onMouseEnter={() => setActive(active)}>
                 <div className="flex items-baseline justify-between gap-2 mb-1">
                   <span className="f-mono text-[9px] tracking-widest" style={{ color: '#0051BA' }}>{pick.product.sku}</span>
-                  <button onClick={() => setActive(null)} className="f-mono text-[10px] opacity-60">✕</button>
+                  {h.fallback && (
+                    <span className="f-mono text-[8px] tracking-widest opacity-60">EST.</span>
+                  )}
                 </div>
                 <div className="f-display italic text-lg leading-tight mb-1">{pick.product.name}</div>
                 <div className="f-mono text-[10px] opacity-70 mb-2">
