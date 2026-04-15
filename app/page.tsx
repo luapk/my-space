@@ -1,16 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { CATALOGUE, solveLayout, Scene, Layout } from '@/lib/catalogue';
+import { CATALOGUE, solveLayout, snapToRatio, Scene, Layout } from '@/lib/catalogue';
 import HotspotImage from './components/HotspotImage';
 
 type Stage = 'upload' | 'analysing' | 'rendering' | 'scanning' | 'results' | 'error';
-type Hotspot = { sku: string; bbox: [number, number, number, number] };
+type Hotspot = { sku: string; bbox: [number, number, number, number]; fallback?: boolean };
+type Ratio = { name: string; value: number; css: string };
 
 export default function Page() {
   const [stage, setStage] = useState<Stage>('upload');
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [imgData, setImgData] = useState<{ base64: string; mediaType: string } | null>(null);
+  const [ratio, setRatio] = useState<Ratio>({ name: '4:3', value: 4/3, css: '4 / 3' });
   const [scene, setScene] = useState<Scene | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [rendered, setRendered] = useState<{ url: string; base64: string; mediaType: string } | null>(null);
@@ -29,6 +31,10 @@ export default function Page() {
       const result = reader.result as string;
       setImgUrl(result);
       setImgData({ base64: result.split(',')[1], mediaType: file.type });
+      // Measure dimensions to snap aspect ratio
+      const img = new Image();
+      img.onload = () => setRatio(snapToRatio(img.naturalWidth, img.naturalHeight));
+      img.src = result;
     };
     reader.readAsDataURL(file);
   };
@@ -56,7 +62,7 @@ export default function Page() {
       const rRes = await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...imgData, scene: s, layout: l, model }),
+        body: JSON.stringify({ ...imgData, scene: s, layout: l, model, aspectRatio: ratio.name }),
       });
       const rData = await rRes.json();
       if (!rRes.ok) throw new Error(rData.error || 'Render failed');
@@ -114,7 +120,7 @@ export default function Page() {
       <header className="border-b-2 border-black sticky top-0 z-30" style={{ background: '#F5F1E8' }}>
         <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-baseline gap-3 min-w-0">
-            <span className="f-mono text-[10px] tracking-widest shrink-0" style={{ color: '#0051BA' }}>v0.3</span>
+            <span className="f-mono text-[10px] tracking-widest shrink-0" style={{ color: '#0051BA' }}>v0.4</span>
             <span className="f-display italic text-xl sm:text-2xl leading-none truncate">IKEA My Space</span>
           </div>
           <div className="flex items-center gap-2">
@@ -143,7 +149,7 @@ export default function Page() {
                 concept back.
               </h1>
               <p className="f-mono text-xs leading-relaxed opacity-80 mb-6 max-w-md">
-                Claude Vision reads your room. A deterministic solver picks real IKEA storage. Nano Banana 2 renders the exact same space, reorganized. Interactive hotspots let you tap each product.
+                Claude Vision reads your room and roasts it. A deterministic solver picks real IKEA storage. Nano Banana 2 renders the same space, reorganized, in the same aspect ratio you uploaded. Hover any product hotspot for details.
               </p>
               <ul className="f-mono text-[11px] space-y-1 opacity-70 mb-6">
                 <li>→ Works best on a single wall or corner shot</li>
@@ -159,7 +165,11 @@ export default function Page() {
               </div>
               {imgUrl ? (
                 <div>
-                  <img src={imgUrl} alt="uploaded" className="w-full h-64 object-cover border border-black mb-4"/>
+                  <img src={imgUrl} alt="uploaded" className="w-full object-cover border border-black mb-3"
+                       style={{ aspectRatio: ratio.css, maxHeight: '320px' }}/>
+                  <div className="f-mono text-[10px] tracking-widest mb-3 opacity-60">
+                    DETECTED RATIO · {ratio.name}
+                  </div>
                   <div className="flex gap-2">
                     <button onClick={run} className="flex-1 py-3 f-mono text-xs tracking-widest"
                             style={{ background: '#FFDB00', border: '2px solid #0A0A0A' }}>
@@ -226,8 +236,11 @@ export default function Page() {
               <SectionTitle n="02" title="before / after"/>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="border-2 border-black bg-white p-2">
-                  <img src={imgUrl!} alt="before" className="w-full aspect-[4/3] object-cover"/>
-                  <div className="f-mono text-[10px] tracking-widest mt-2 opacity-60 px-1">BEFORE</div>
+                  <img src={imgUrl!} alt="before" className="w-full object-cover" style={{ aspectRatio: ratio.css }}/>
+                  <div className="f-mono text-[10px] tracking-widest mt-2 opacity-60 px-1 flex justify-between">
+                    <span>BEFORE</span>
+                    <span>{ratio.name}</span>
+                  </div>
                 </div>
                 {rendered && (
                   <HotspotImage
@@ -238,20 +251,21 @@ export default function Page() {
                     setActive={setActiveHotspot}
                     onAdd={addToBasket}
                     basket={basket}
+                    aspectRatio={ratio.css}
                   />
                 )}
               </div>
               {hotspots.length > 0 && (
                 <div className="f-mono text-[10px] opacity-60 mt-2">
-                  Tap any numbered hotspot for product details and a dummy add-to-basket.
+                  Hover a hotspot for product details. White rings are estimated positions.
                 </div>
               )}
             </section>
 
             <section>
               <SectionTitle n="03" title="scene manifest"/>
-              <div className="border-2 border-black bg-white p-5">
-                <p className="f-display italic text-xl mb-4 leading-snug">"{scene.current_state}"</p>
+              <div className="border-2 border-black bg-white p-5 md:p-6">
+                <p className="f-display italic text-xl md:text-2xl mb-5 leading-snug">{scene.current_state}</p>
                 <table className="w-full f-mono text-xs">
                   <tbody>
                     {scene.items.map((it, i) => (
