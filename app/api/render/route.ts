@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const { base64, mediaType, scene, layout, model } = await req.json();
+    const { base64, mediaType, scene, layout, model, aspectRatio } = await req.json();
     if (!base64 || !scene || !layout) {
       return NextResponse.json({ error: 'Missing image, scene or layout' }, { status: 400 });
     }
@@ -18,18 +18,27 @@ export async function POST(req: Request) {
     const prompt = buildRenderPrompt(scene as Scene, layout as Layout);
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent?key=${apiKey}`;
 
+    const body: any = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mediaType, data: base64 }},
+        ],
+      }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+      },
+    };
+
+    // Pass aspect ratio via image_config (Gemini 3.x image API)
+    if (aspectRatio) {
+      body.generationConfig.imageConfig = { aspectRatio };
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mediaType, data: base64 }},
-          ],
-        }],
-        generationConfig: { responseModalities: ['IMAGE'] },
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
