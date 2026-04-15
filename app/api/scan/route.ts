@@ -11,16 +11,23 @@ export async function POST(req: Request) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
 
-    const prompt = `Analyse this image of a room with IKEA storage. Identify each distinct storage unit visible and return bounding boxes.
+    const skuList = expectedSkus || [];
+    const prompt = `You are looking at a rendered photo of a room containing IKEA storage units. You will return bounding boxes for every SKU listed.
 
-Return ONLY valid JSON (no markdown) matching this schema:
-{"hotspots":[{"sku":"KALLAX-4x4","bbox":[x,y,w,h]}]}
+EXPECTED SKUs (you MUST return exactly one hotspot for EACH of these, even if a unit is partially obscured or hard to identify — make your best estimate):
+${skuList.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}
 
-bbox values are normalized 0-1 where [0,0] is top-left and [1,1] is bottom-right. x,y is the top-left corner of the box, w,h are width and height as fractions.
+Return ONLY valid JSON, no markdown:
+{"hotspots":[{"sku":"<exact SKU from the list>","bbox":[x,y,w,h]}]}
 
-Expected SKUs in this image (match only to these): ${(expectedSkus || []).join(', ')}
+bbox is normalized 0-1: [0,0] is the top-left of the image, [1,1] is the bottom-right. x and y are the top-left corner of the box, w and h are width and height as fractions of the image.
 
-For each visible storage unit, choose the closest matching SKU from the list and provide a tight bounding box. Return one hotspot per distinct unit. Be precise.`;
+CRITICAL:
+- Return exactly ${skuList.length} hotspots, one per SKU, in the order listed above.
+- If a unit looks like it could match more than one SKU, use the SKU that appears next in the list (no duplicates).
+- If a unit is occluded or difficult to find, return your best guess for its bounding box rather than omitting it.
+- Each bbox must be a tight rectangle around the unit. Avoid overlapping centres if at all possible.
+- Use only the SKUs from the expected list — never invent new ones.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -31,7 +38,7 @@ For each visible storage unit, choose the closest matching SKU from the list and
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 1000,
+        max_tokens: 1500,
         messages: [{
           role: 'user',
           content: [
@@ -49,8 +56,25 @@ For each visible storage unit, choose the closest matching SKU from the list and
     const data = await res.json();
     const text = data.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-    return NextResponse.json({ hotspots: parsed.hotspots || [] });
+    let hotspots = parsed.hotspots || [];
+
+    // Fallback: if Claude missed any SKU, distribute defaults across the bottom
+    const returnedSkus = new Set(hotspots.map((h: any) => h.sku));
+    const missing = skuList.filter((s: string) => !returnedSkus.has(s));
+    if (missing.length) {
+      const slotW = 1 / (missing.length + 1);
+      missing.forEach((sku: string, i: number) => {
+        const cx = slotW * (i + 1);
+        hotspots.push({
+          sku,
+          bbox: [cx - 0.06, 0.7, 0.12, 0.18],
+          fallback: true,
+        });
+      });
+    }
+
+    return NextResponse.json({ hotspots });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, hotspots: [] }, { status: 200 }); // non-fatal
+    return NextResponse.json({ error: e.message, hotspots: [] }, { status: 200 });
   }
 }
