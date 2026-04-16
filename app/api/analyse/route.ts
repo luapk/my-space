@@ -20,24 +20,31 @@ Schema:
 DIMENSIONS: Use reference objects. UK door ~200cm, plug socket ~8.6cm, skirting ~15cm. If no reference visible, assume wall 300-400cm wide, 240cm high. Maximum 5 item entries. Count conservatively.
 
 VOICE FOR "current_state":
-Write 3-4 sentences in the voice of an unimpressed but fond friend who has been asked to look at the photo. The friend is dry, observant, specific. Roast the mess based on what is actually visible in the image. Cite real details: a specific stack, a specific pile, a specific corner the eye keeps returning to. The first sentence should land. The last sentence should land harder.
+You are roasting this room. Funny, observant, affectionate underneath. The roast must contain at least TWO metaphors or similes that personify the mess. Objects have moods. Piles have politics. Stacks have ambitions. The room is a small civilisation that has lost its way.
 
-Tone: deadpan, observational, gently mocking. Like the room has disappointed a tasteful older sibling. Affectionate underneath. Never cruel. Never preachy. Never the word "honestly".
+Write 4 sentences. Each one earns its place. The first sentence sets the scene with one bold image. The middle sentences pile on specifics, each with its own metaphor or wry observation. The last sentence is the kicker, the one that lands hardest.
 
-Hard rules for the copy:
-- No em dashes anywhere. Use full stops and commas.
-- No "imagine", no "in a world where", no "let's", no "here's the thing".
-- No "elevate", "unlock", "reimagine", "journey", "transform", "curated".
-- No three-item lists. No "not just X, it's Y".
-- No "honestly", no exclamation marks, no rhetorical questions.
-- No promise of a fix. No mention of IKEA or storage. The roast stands alone.
-- Specific over clever. The detail is the joke.
+Cite real things visible in this specific photo. The detail is the joke. A generic roast is a failed roast.
 
-Examples of the right voice (do not copy these, write fresh ones for THIS image):
-- "Three competing piles of paper on a desk that hasn't seen its own surface in a year. The keyboard is operating from inside a sandwich of unopened post. The plant in the corner has clearly given up on you."
-- "A cable situation that suggests a small hostage scenario. The records are not on a shelf, they are on every horizontal surface that isn't a shelf. Whatever happened to that hoodie on the chair, it happened weeks ago."
+EXAMPLES OF THE VOICE (write fresh ones for THIS image, never copy these):
 
-Now analyse the image and write fresh copy in this voice for "current_state".`;
+"This desk has the haunted look of a place where productivity comes to die. Three coffee mugs are forming a small ceramic Stonehenge around the keyboard. The pile of unopened post on the chair has been there long enough to qualify for council tax. Somewhere underneath all this, a person is allegedly trying to work."
+
+"The records are not on a shelf, they are on a pilgrimage across every flat surface in the room. The plant in the corner is filing for emancipation. There are at least four cables behaving like a small hostage situation behind the TV. The cat, who has seen things, will not comment."
+
+"This is a room that has been quietly losing a war for about eighteen months. The books on the floor have organised themselves into tribes by colour, which is worse than no system at all. A jumper is draped over the chair with the dramatic resignation of a Victorian heroine. None of it is unsalvageable, but all of it is a choice."
+
+HARD RULES:
+- No em dashes anywhere. Use full stops, commas, colons.
+- No "imagine", no "in a world where", no "let's", no "here's the thing", no "honestly".
+- No "elevate", "unlock", "reimagine", "journey", "transform", "curated", "discover".
+- No three-item lists with parallel structure. No "not just X, it's Y".
+- No exclamation marks. No rhetorical questions. No emoji.
+- No mention of IKEA, storage, organising, solutions, or how to fix it. The roast stands alone.
+- No moralising. No "we've all been there". No softening qualifiers like "to be fair" or "in fairness".
+- The metaphors must be specific and surprising, not the obvious ones. "Piles like mountains" is dead on arrival.
+
+Now write fresh "current_state" copy in this voice for THIS image.`;
 
 export async function POST(req: Request) {
   try {
