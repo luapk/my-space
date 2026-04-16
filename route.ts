@@ -3,31 +3,47 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
+const PROMPT = `Analyse this room photo and extract its architectural structure. Ignore all movable objects (furniture, clutter, people, plants, books, records, clothing, boxes). Focus ONLY on the permanent architectural features.
+
+Return ONLY valid JSON, no markdown fences, no prose.
+
+Schema:
+{
+  "wall_width_cm": number,
+  "wall_height_cm": number,
+  "room_depth_cm": number,
+  "wall_colour_hex": "string (e.g. #E8E4D8)",
+  "floor_colour_hex": "string",
+  "ceiling_colour_hex": "string",
+  "features": [
+    {
+      "type": "door"|"window"|"radiator"|"light_switch"|"power_socket"|"boiler"|"gas_unit"|"fireplace"|"skirting_vent"|"thermostat"|"shelf_built_in"|"alcove",
+      "wall": "back"|"left"|"right"|"floor"|"ceiling",
+      "x_cm": number,
+      "y_cm": number,
+      "width_cm": number,
+      "height_cm": number,
+      "label": "short descriptor (e.g. 'white panel door' or 'double-hung window')"
+    }
+  ],
+  "confidence": "low"|"medium"|"high"
+}
+
+INSTRUCTIONS:
+- x_cm and y_cm are the top-left corner of each feature's bounding rectangle on its wall. For features on the back wall, x is measured from the left edge of the wall and y is measured from the floor upward. For features on the left or right wall, x is measured from the back and y from the floor. For floor features, x is left-right and y is front-back. For ceiling features, x is left-right and y is back-front.
+- Use standard UK architectural dimensions as reference: interior door 90cm wide × 200cm tall, sash window typically 80-120cm wide × 140-180cm tall, plug socket 8.6cm × 8.6cm, light switch 8.6cm × 8.6cm, domestic radiator 60-180cm wide × 30-80cm tall, combi boiler around 40cm × 70cm.
+- If the room dimensions are unclear, default to 350×240×400cm (width × height × depth).
+- Return 3-10 features maximum. Only include features that are visible and clearly identifiable.
+- If you are not sure what a feature is, don't include it.
+- Wall colour: return the hex code for the dominant wall surface colour. Floor: the dominant floor colour. Ceiling: usually off-white, extract the specific shade if visible.`;
+
 export async function POST(req: Request) {
   try {
-    const { base64, mediaType, expectedSkus } = await req.json();
+    const { base64, mediaType } = await req.json();
     if (!base64) return NextResponse.json({ error: 'No image' }, { status: 400 });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
-
-    const skuList = expectedSkus || [];
-    const prompt = `You are looking at a rendered photo of a room containing IKEA storage units. You will return bounding boxes for every SKU listed.
-
-EXPECTED SKUs (you MUST return exactly one hotspot for EACH of these, even if a unit is partially obscured or hard to identify — make your best estimate):
-${skuList.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}
-
-Return ONLY valid JSON, no markdown:
-{"hotspots":[{"sku":"<exact SKU from the list>","bbox":[x,y,w,h]}]}
-
-bbox is normalized 0-1: [0,0] is the top-left of the image, [1,1] is the bottom-right. x and y are the top-left corner of the box, w and h are width and height as fractions of the image.
-
-CRITICAL:
-- Return exactly ${skuList.length} hotspots, one per SKU, in the order listed above.
-- If a unit looks like it could match more than one SKU, use the SKU that appears next in the list (no duplicates).
-- If a unit is occluded or difficult to find, return your best guess for its bounding box rather than omitting it.
-- Each bbox must be a tight rectangle around the unit. Avoid overlapping centres if at all possible.
-- Use only the SKUs from the expected list — never invent new ones.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -38,12 +54,12 @@ CRITICAL:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 1500,
+        max_tokens: 2000,
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 }},
-            { type: 'text', text: prompt },
+            { type: 'text', text: PROMPT },
           ],
         }],
       }),
@@ -55,26 +71,9 @@ CRITICAL:
     }
     const data = await res.json();
     const text = data.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-    let hotspots = parsed.hotspots || [];
-
-    // Fallback: if Claude missed any SKU, distribute defaults across the bottom
-    const returnedSkus = new Set(hotspots.map((h: any) => h.sku));
-    const missing = skuList.filter((s: string) => !returnedSkus.has(s));
-    if (missing.length) {
-      const slotW = 1 / (missing.length + 1);
-      missing.forEach((sku: string, i: number) => {
-        const cx = slotW * (i + 1);
-        hotspots.push({
-          sku,
-          bbox: [cx - 0.06, 0.7, 0.12, 0.18],
-          fallback: true,
-        });
-      });
-    }
-
-    return NextResponse.json({ hotspots });
+    const architecture = JSON.parse(text.replace(/```json|```/g, '').trim());
+    return NextResponse.json({ architecture });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, hotspots: [] }, { status: 200 });
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
