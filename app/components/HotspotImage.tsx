@@ -2,10 +2,10 @@
 
 import { Pick } from '@/lib/catalogue';
 
-type Hotspot = { sku: string; bbox: [number, number, number, number]; fallback?: boolean };
+type Hotspot = { sku: string; bbox: [number, number, number, number]; confidence?: string; fallback?: boolean };
 
 export default function HotspotImage({
-  url, hotspots, picks, active, setActive, onAdd, basket, aspectRatio,
+  url, hotspots, picks, active, setActive, onAdd, basket, aspectRatio, label,
 }: {
   url: string;
   hotspots: Hotspot[];
@@ -14,16 +14,16 @@ export default function HotspotImage({
   setActive: (n: number | null) => void;
   onAdd: (sku: string) => void;
   basket: string[];
-  aspectRatio: string; // e.g. "4 / 3"
+  aspectRatio: string;
+  label?: string;
 }) {
   return (
     <div className="relative border-2 border-black bg-white p-2">
-      <div className="relative" onMouseLeave={() => setActive(null)}>
+      <div className="relative bg-[#F5F1E8]" style={{ aspectRatio }} onMouseLeave={() => setActive(null)}>
         <img
           src={url}
           alt="rendered"
-          className="w-full object-cover block"
-          style={{ aspectRatio }}
+          className="absolute inset-0 w-full h-full object-contain block"
         />
         {hotspots.map((h, i) => {
           const pick = picks.find(p => p.product.sku === h.sku);
@@ -31,18 +31,19 @@ export default function HotspotImage({
           const cx = (h.bbox[0] + h.bbox[2] / 2) * 100;
           const cy = (h.bbox[1] + h.bbox[3] / 2) * 100;
           const isActive = active === i;
+          const isFallback = h.fallback || h.confidence === 'low';
           return (
             <button
               key={i}
               onMouseEnter={() => setActive(i)}
               onClick={() => setActive(isActive ? null : i)}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
+              className="absolute -translate-x-1/2 -translate-y-1/2 z-10"
               style={{ left: `${cx}%`, top: `${cy}%` }}
               aria-label={pick.product.name}
             >
               <div className="hotspot-ring relative w-7 h-7 rounded-full flex items-center justify-center"
                    style={{
-                     background: h.fallback ? '#FFFFFF' : '#FFDB00',
+                     background: isFallback ? '#FFFFFF' : '#FFDB00',
                      border: '2px solid #0A0A0A',
                    }}>
                 <span className="f-mono text-[11px] font-bold">{i + 1}</span>
@@ -57,14 +58,15 @@ export default function HotspotImage({
           const cx = (h.bbox[0] + h.bbox[2] / 2) * 100;
           const top = (h.bbox[1] + h.bbox[3]) * 100;
           const inBasket = basket.includes(h.sku);
+          const isFallback = h.fallback || h.confidence === 'low';
           return (
             <div className="absolute z-20 -translate-x-1/2 pointer-events-none"
-                 style={{ left: `${cx}%`, top: `${Math.min(top + 1, 72)}%`, minWidth: '200px', maxWidth: '240px' }}>
+                 style={{ left: `${cx}%`, top: `${Math.min(top + 1, 70)}%`, minWidth: '210px', maxWidth: '240px' }}>
               <div className="bg-white border-2 border-black p-3 shadow-lg pointer-events-auto"
                    onMouseEnter={() => setActive(active)}>
                 <div className="flex items-baseline justify-between gap-2 mb-1">
                   <span className="f-mono text-[9px] tracking-widest" style={{ color: '#0051BA' }}>{pick.product.sku}</span>
-                  {h.fallback && (
+                  {isFallback && (
                     <span className="f-mono text-[8px] tracking-widest opacity-60">EST.</span>
                   )}
                 </div>
@@ -87,7 +89,7 @@ export default function HotspotImage({
         })()}
       </div>
       <div className="f-mono text-[10px] tracking-widest mt-2 opacity-60 px-1 flex justify-between">
-        <span>AFTER · NANO BANANA 2</span>
+        <span>{label || 'HOW IT\'S GOING'}</span>
         {hotspots.length > 0 && <span>{hotspots.length} HOTSPOTS</span>}
       </div>
     </div>
