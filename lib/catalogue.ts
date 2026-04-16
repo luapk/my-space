@@ -64,6 +64,26 @@ export const PREF: Record<string, { families: string[]; capKey: string; insert: 
   plants:          { families: ['VITTSJO', 'KALLAX', 'LACK'],           capKey: 'general', insert: null      },
 };
 
+// Gemini-supported aspect ratios. Keep ordered for snap-to-nearest readability.
+export const SUPPORTED_RATIOS: { name: string; value: number; css: string }[] = [
+  { name: '9:16', value: 9/16,  css: '9 / 16' },
+  { name: '2:3',  value: 2/3,   css: '2 / 3'  },
+  { name: '3:4',  value: 3/4,   css: '3 / 4'  },
+  { name: '4:5',  value: 4/5,   css: '4 / 5'  },
+  { name: '1:1',  value: 1,     css: '1 / 1'  },
+  { name: '5:4',  value: 5/4,   css: '5 / 4'  },
+  { name: '4:3',  value: 4/3,   css: '4 / 3'  },
+  { name: '3:2',  value: 3/2,   css: '3 / 2'  },
+  { name: '16:9', value: 16/9,  css: '16 / 9' },
+];
+
+export function snapToRatio(width: number, height: number) {
+  const ratio = width / height;
+  return SUPPORTED_RATIOS.reduce((a, b) =>
+    Math.abs(b.value - ratio) < Math.abs(a.value - ratio) ? b : a
+  );
+}
+
 export type SceneItem = { category: string; estimated_count: number; notes?: string };
 export type Scene = {
   room_type: string;
@@ -123,14 +143,14 @@ export function buildRenderPrompt(scene: Scene, layout: Layout): string {
     .map(i => `${i.estimated_count} ${i.category.replace(/_/g, ' ')}`)
     .join(', ');
 
-  return `Generate a photo of the EXACT SAME room from the SAME camera angle as the reference image.
+  return `Generate a photo of the EXACT SAME room from the SAME camera angle as the reference image. Match the reference image's framing and aspect ratio precisely.
 
 CRITICAL REQUIREMENTS:
 - Same walls, same wall colour (${scene.wall_colour || 'unchanged'}), same floor (${scene.floor_material || 'unchanged'}), same lighting, same windows, same architectural details
-- Same camera position and perspective
+- Same camera position, same perspective, same focal length, same crop
 - Photorealistic, matching the photographic style of the reference
 
-ORGANIZE THE ROOM by adding these specific IKEA storage units placed neatly against the main wall:
+ORGANIZE THE ROOM by adding these specific IKEA storage units placed neatly against the main wall. Every unit listed MUST be visible in the final image, none hidden behind another:
 ${productList}
 
 All personal items from the original photo must remain visible but neatly organized into or onto these IKEA units: ${itemList}.
